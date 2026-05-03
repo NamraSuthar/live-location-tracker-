@@ -1,8 +1,8 @@
 // Auth configuration
 const AUTH_CONFIG = {
-    dwaarUrl: window.DWAAR_ISSUER_URL || 'https://dwaar-okjc.onrender.com', // Your Dwaar server URL
-    clientId: window.DWAAR_CLIENT_ID || 'c1e631353cf23a4bbca6e371f14babe1', // Get from Dwaar
-    redirectUri: window.location.origin + '/login.html'
+    dwaarUrl: 'https://dwaar-okjc.onrender.com', // Your Dwaar server URL
+    clientId: 'c1e631353cf23a4bbca6e371f14babe1', // Get from Dwaar
+    redirectUri: 'https://trackkar-client.onrender.com/'
 };
 
 // Check if user is authenticated
