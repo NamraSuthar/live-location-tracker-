@@ -55,7 +55,7 @@ io.on("connection", (socket) => {
         try {
             const userId = socket.user.sub
 
-            const locationEvant = {
+            const locationEvent = {
                 userId,
                 latitude: data.latitude,
                 longitude: data.longitude,
@@ -64,13 +64,13 @@ io.on("connection", (socket) => {
 
             await producer.send({
                 topic: "location-update",
-                message: [{
+                messages: [{
                     key: userId,
-                    value: JSON.stringify(locationEvant)
+                    value: JSON.stringify(locationEvent)
                 }]
             })
         } catch (error) {
-            console.error("error sending location", error.Message)
+            console.error("error sending location", error.message)
         }
     })
 

@@ -15,8 +15,10 @@ const getKey = (header, callback) => {
 export const socketAuthMiddleware = (socket, next) => {
   const token = socket.handshake.auth?.token;
 
+  // Dev mode - skip JWT if not provided
   if (!token) {
-    return next(new Error("Unauthorized"));
+    socket.user = { sub: socket.id };
+    return next();
   }
 
   jwt.verify(

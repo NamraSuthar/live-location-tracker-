@@ -1,0 +1,12 @@
+{
+  "name": "location-tracker-client",
+  "version": "1.0.0",
+  "description": "Live Location Tracker Client",
+  "type": "module",
+  "scripts": {
+    "dev": "http-server . -p 8000 -c-1"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
