@@ -22,8 +22,7 @@
 
         .login-container {
             background: white;
-            border-color: solid #000;
-            border-radius: 2px;
+            border-color: 5px solid #000;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
             padding: 40px;
             max-width: 400px;
@@ -55,7 +54,7 @@
             width: 100%;
             padding: 12px 20px;
             margin-top: 30px;
-            background: linear-gradient(135deg, #f4f4f7 0%, #0c0c0c 100%);
+            background: linear-gradient(135deg, #0d0d0e 0%, #0c0c0c 100%);
             color: white;
             border: none;
             border-radius: 8px;
@@ -118,7 +117,7 @@
             const redirectUri = window.location.origin + '/auth/callback';
             const dwaarUrl = 'https://clickkar.onrender.com'; // Your Dwaar server
 
-            const authUrl = `${dwaarUrl}/oauth/authorize?` +
+            const authUrl = `${dwaarUrl}/o/authenticate?` +
                 `client_id=${clientId}&` +
                 `redirect_uri=${encodeURIComponent(redirectUri)}&` +
                 `response_type=code&` +
