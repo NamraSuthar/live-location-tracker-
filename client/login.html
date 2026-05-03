@@ -126,13 +126,7 @@
             window.location.href = authUrl;
         }
 
-        // Check if already logged in
-        window.addEventListener('load', () => {
-            const token = localStorage.getItem('jwt_token') || sessionStorage.getItem('jwt_token');
-            if (token) {
-                window.location.href = '/';
-            }
-        });
+      
     </script>
 </body>
 </html>
