@@ -63,20 +63,28 @@ io.on("connection", (socket) => {
                 timeStamp: Date.now(),
             }
 
-            await producer.send({
-                topic: "location-update",
-                messages: [{
-                    key: userId,
-                    value: JSON.stringify(locationEvent)
-                }]
-            })
+            // Broadcast to all clients immediately
+            io.emit('receive-location', locationEvent);
+
+            // Try Kafka if available
+            try {
+                await producer.send({
+                    topic: "location-update",
+                    messages: [{
+                        key: userId,
+                        value: JSON.stringify(locationEvent)
+                    }]
+                })
+            } catch (kafkaErr) {
+                // Kafka failed but broadcast already sent
+            }
         } catch (error) {
             console.error("error sending location", error.message)
         }
     })
+        }
+    )
 
-}
-)
 
 
 
