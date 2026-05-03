@@ -7,6 +7,8 @@ export const connectProducer = async () => {
         await producer.connect()
         console.log(`producer kafka connected`)
     } catch (err) {
-        console.error("Failed to connect producer:", err.message)
+        console.warn("Kafka unavailable - using Socket.IO broadcast")
     }
 }
+
+export const isKafkaConnected = () => false;
