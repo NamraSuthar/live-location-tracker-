@@ -51,7 +51,11 @@ class LocationTracker {
     }
 
     getBackendUrl() {
-        // Change this to your actual backend URL
+        // Production
+        if (window.location.hostname !== 'localhost') {
+            return 'https://trackkar-server.onrender.com';
+        }
+        // Local dev
         return 'http://localhost:5000';
     }
 
