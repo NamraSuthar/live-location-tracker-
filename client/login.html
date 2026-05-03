@@ -113,9 +113,9 @@
 
     <script>
         function loginWithDwaar() {
-            const clientId = 'your_client_id'; // Will be in .env
+            const clientId = process.env.DWAAR_CLIENT_ID; // Will be in .env
             const redirectUri = window.location.origin + '/auth/callback';
-            const dwaarUrl = 'https://clickkar.onrender.com'; // Your Dwaar server
+            const dwaarUrl = process.env.DWAAR_ISSUER_URL; // Your Dwaar server
 
             const authUrl = `${dwaarUrl}/o/authenticate?` +
                 `client_id=${clientId}&` +
