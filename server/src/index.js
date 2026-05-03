@@ -21,7 +21,8 @@ const server = http.createServer(app)
 
 const io = new Server(server, {
     cors: {
-        origin: "*",
+        origin: ["http://localhost:8000", "https://trackkar-client.onrender.com"],
+        methods: ["GET", "POST"]
     }
 })
 
@@ -134,11 +135,15 @@ const startServer = async () => {
         }
     }
 
-    // initialize Kafka connections in background so startup isn't blocked
-    await connectProducer().catch((err) => console.error("Producer init error", err))
-    await connectConsumer().catch((err) => console.error("Consumer init error", err))
-    await runConsumer(io)
-    await startDBConsumer()
+    // Initialize Kafka in background - don't crash if it fails
+    if (process.env.KAFKA_BROKER) {
+        await connectProducer().catch((err) => console.warn("Producer init warning:", err.message))
+        await connectConsumer().catch((err) => console.warn("Consumer init warning:", err.message))
+        await runConsumer(io).catch((err) => console.warn("Consumer run warning:", err.message))
+        await startDBConsumer().catch((err) => console.warn("DB Consumer warning:", err.message))
+    } else {
+        console.log("⚠️  Kafka not configured - using direct Socket.IO broadcast")
+    }
 }
 
 startServer();
