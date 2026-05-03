@@ -12,6 +12,7 @@ import { connectProducer } from "./kafka/producer.js";
 import { connectConsumer, runConsumer } from "./kafka/consumer.js";
 import { timeStamp } from "console";
 import { producer } from "./kafka/producer.js"
+import { startDBConsumer } from "./kafka/dbConsumer.js";
 
 const app = express();
 const START_PORT = Number(process.env.PORT ?? 5000);
@@ -134,9 +135,10 @@ const startServer = async () => {
     }
 
     // initialize Kafka connections in background so startup isn't blocked
-    connectProducer().catch((err) => console.error("Producer init error", err))
-    connectConsumer().catch((err) => console.error("Consumer init error", err))
+    await connectProducer().catch((err) => console.error("Producer init error", err))
+    await connectConsumer().catch((err) => console.error("Consumer init error", err))
     await runConsumer(io)
+    await startDBConsumer()
 }
 
 startServer();
