@@ -114,3 +114,57 @@ This decouples socket layer from persistence - key for scalability!
 - **Can't connect to server?** Check if port 5000 is available
 - **No locations showing?** Verify browser geolocation permission
 - **Kafka errors?** Ensure Kafka broker is running
+
+## Deployment on Render
+
+### 1. Push to GitHub
+```bash
+git add .
+git commit -m "feat: add complete TrackKar location tracking with Kafka"
+git push origin main
+```
+
+### 2. Deploy Server on Render
+
+**Create Web Service:**
+- Go to [render.com](https://render.com)
+- New → Web Service
+- Connect GitHub repo
+- **Runtime:** Node
+- **Build Command:** `cd server && pnpm install`
+- **Start Command:** `cd server && pnpm dev`
+
+**Environment Variables:**
+```
+PORT=5000
+KAFKA_BROKER=your-kafka-broker:9092
+DWAAR_JWKS_URI=https://dwaar-okjc.onrender.com/.well-known/jwks.json
+DWAAR_ISSUER_URL=https://dwaar-okjc.onrender.com
+DWAAR_CLIENT_ID=your-client-id
+```
+
+### 3. Deploy Frontend on Render
+
+**Create Static Site:**
+- New → Static Site
+- Connect GitHub repo
+- **Publish Directory:** `client`
+- **Build Command:** (leave empty - no build needed)
+
+### 4. Update Client Connection
+
+In `client/app.js`, change:
+```javascript
+getBackendUrl() {
+    return 'https://your-render-server.onrender.com'; // Your Render server URL
+}
+```
+
+### 5. Kafka Setup for Production
+
+Use Confluent Cloud or Upstash:
+- Create cluster
+- Get broker URL
+- Update `KAFKA_BROKER` env var on Render
+
+**Done!** Your app is live 🚀
