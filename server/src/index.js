@@ -9,8 +9,9 @@ import { notFoundHandler } from "./middleware/notFound.middleware.js";
 import { errorHandler } from "./middleware/error.middleware.js";
 import { socketAuthMiddleware } from "./sockets/auth.socket.js";
 import { connectProducer } from "./kafka/producer.js";
-import { connectConsumer } from "./kafka/consumer.js";
-
+import { connectConsumer, runConsumer } from "./kafka/consumer.js";
+import { timeStamp } from "console";
+import { producer } from "./kafka/producer.js"
 
 const app = express();
 const START_PORT = Number(process.env.PORT ?? 5000);
@@ -29,12 +30,15 @@ io.use(socketAuthMiddleware)
 const userSocketMap = new Map();
 
 io.on("connection", (socket) => {
+
+
     const userId = socket.user.sub;
     if (!userId) {
         console.log("Unauthorized socket");
         socket.disconnect();
         return;
     }
+
 
     userSocketMap.set(userId, socket.id);
     console.log("connection", socket.id)
@@ -43,7 +47,34 @@ io.on("connection", (socket) => {
         userSocketMap.delete(userId)
         console.log("disconnect:", socket.id)
     })
-})
+
+
+
+    socket.on("send-location", async (data) => {
+        try {
+            const userId = socket.user.sub
+
+            const locationEvant = {
+                userId,
+                latitude: data.latitude,
+                longitude: data.longitude,
+                timeStamp: Date.now(),
+            }
+
+            await producer.send({
+                topic: "location-update",
+                message: [{
+                    key: userId,
+                    value: JSON.stringify(locationEvant)
+                }]
+            })
+        } catch (error) {
+            console.error("error sending location", error.Message)
+        }
+    })
+
+}
+)
 
 
 
@@ -105,6 +136,7 @@ const startServer = async () => {
     // initialize Kafka connections in background so startup isn't blocked
     connectProducer().catch((err) => console.error("Producer init error", err))
     connectConsumer().catch((err) => console.error("Consumer init error", err))
+    await runConsumer(io)
 }
 
 startServer();

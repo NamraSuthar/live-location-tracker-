@@ -17,3 +17,14 @@ export const connectConsumer = async () => {
         console.error("Failed to connect consumer:", err.message)
     }
 }
+
+export const runConsumer = async(io) =>{
+    await consumer.run({
+        eachMessage: async ({message})=>{
+            const data = JSON.parse(message.value.toString())
+
+            console.log("Location received", data)
+            io.emit("receive-location",data)
+        }
+    })
+}
