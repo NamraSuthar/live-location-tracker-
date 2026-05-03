@@ -1,4 +1,4 @@
-import jwk from "jsonwebtoken"
+import jwt from "jsonwebtoken"
 import jwksClient from "jwks-rsa"
 
 const client = jwksClient({
@@ -30,7 +30,7 @@ export const authMiddleware = (req, res, next) => {
     token,
     getKey,
     {
-      issuer: process.env.DWAR_ISSUER_URL,
+      issuer: process.env.DWAAR_ISSUER_URL,
       audience: process.env.DWAAR_CLIENT_ID,
     },
     (err, decoded) => {

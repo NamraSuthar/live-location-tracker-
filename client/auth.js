@@ -1,7 +1,7 @@
 // Auth configuration
 const AUTH_CONFIG = {
-    dwaarUrl: 'https://clickkar.onrender.com', // Your Dwaar server URL
-    clientId: 'your_client_id', // Get from Dwaar
+    dwaarUrl: process.env.DWAAR_ISSUER_URL, // Your Dwaar server URL
+    clientId: process.env.DWAAR_CLIENT_ID, // Get from Dwaar
     redirectUri: window.location.origin + '/auth/callback'
 };
 
@@ -38,7 +38,7 @@ async function handleAuthCallback() {
     if (code) {
         try {
             // Exchange code for token
-            const response = await fetch(`${AUTH_CONFIG.dwaarUrl}/oauth/token`, {
+            const response = await fetch(`${AUTH_CONFIG.dwaarUrl}/o/token`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
