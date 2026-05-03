@@ -111,14 +111,17 @@
         </div>
     </div>
 
+    <script src="auth.js"></script>
     <script>
-        function loginWithDwaar() {
-            const clientId = process.env.DWAAR_CLIENT_ID; // Will be in .env
-            const redirectUri = window.location.origin + '/auth/callback';
-            const dwaarUrl = process.env.DWAAR_ISSUER_URL; // Your Dwaar server
+        const DWAAR_CONFIG = {
+            dwaarUrl: "https://dwaar-okjc.onrender.com",
+            clientId: "c1e631353cf23a4bbca6e371f14babe1"
+        };
 
-            const authUrl = `${dwaarUrl}/o/authenticate?` +
-                `client_id=${clientId}&` +
+        function loginWithDwaar() {
+            const redirectUri = window.location.origin + '/login.html';
+            const authUrl = `${DWAAR_CONFIG.dwaarUrl}/o/authenticate?` +
+                `client_id=${encodeURIComponent(DWAAR_CONFIG.clientId)}&` +
                 `redirect_uri=${encodeURIComponent(redirectUri)}&` +
                 `response_type=code&` +
                 `scope=openid profile email`;

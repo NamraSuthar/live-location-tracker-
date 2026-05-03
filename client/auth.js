@@ -1,8 +1,8 @@
 // Auth configuration
 const AUTH_CONFIG = {
-    dwaarUrl: process.env.DWAAR_ISSUER_URL, // Your Dwaar server URL
-    clientId: process.env.DWAAR_CLIENT_ID, // Get from Dwaar
-    redirectUri: window.location.origin + '/auth/callback'
+    dwaarUrl: window.DWAAR_ISSUER_URL || 'https://dwaar-okjc.onrender.com', // Your Dwaar server URL
+    clientId: window.DWAAR_CLIENT_ID || 'c1e631353cf23a4bbca6e371f14babe1', // Get from Dwaar
+    redirectUri: window.location.origin + '/login.html'
 };
 
 // Check if user is authenticated
@@ -75,6 +75,6 @@ function logout() {
 }
 
 // Auto-handle callback on load
-if (window.location.pathname === '/auth/callback') {
+if (getUrlParameter('code') || window.location.pathname === '/auth/callback') {
     handleAuthCallback();
 }
