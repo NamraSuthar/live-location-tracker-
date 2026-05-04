@@ -78,6 +78,26 @@
     <!-- Notification Toast -->
     <div id="notification" class="notification hidden"></div>
 
+    <script>
+        (async () => {
+            try {
+                const backendUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                    ? 'http://localhost:5000'
+                    : 'https://trackkar-server.onrender.com';
+
+                const response = await fetch(`${backendUrl}/auth/me`, {
+                    credentials: 'include'
+                });
+
+                if (response.status === 401) {
+                    window.location.href = '/login.html';
+                }
+            } catch (error) {
+                window.location.href = '/login.html';
+            }
+        })();
+    </script>
+
     <!-- Leaflet JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <!-- Socket.IO Client -->
