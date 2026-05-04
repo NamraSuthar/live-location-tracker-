@@ -87,7 +87,7 @@ router.get("/callback", async (req, res) => {
         console.error('Session save error:', err);
         return res.status(500).json({ error: "Failed to save session" });
       }
-      res.redirect("/");
+      res.redirect(process.env.CLIENT_APP_URL || "http://localhost:8000/index.html");
     });
   } catch (error) {
     console.error("Callback error:", error);
@@ -102,7 +102,7 @@ router.get("/logout", (req, res) => {
     if (err) {
       return res.status(500).json({ error: "Logout failed" });
     }
-    res.redirect("/");
+    res.redirect(process.env.CLIENT_APP_URL ? `${process.env.CLIENT_APP_URL}/login.html` : "http://localhost:8000/login.html");
   });
 });
 
