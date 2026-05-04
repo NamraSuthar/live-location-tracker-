@@ -112,24 +112,5 @@
     </div>
 
     <script src="auth.js"></script>
-    <script>
-        const DWAAR_CONFIG = {
-            dwaarUrl: "https://dwaar-okjc.onrender.com",
-            clientId: "c1e631353cf23a4bbca6e371f14babe1",
-            redirectUri: "https://trackkar-client.onrender.com/"
-        };
-
-        function loginWithDwaar() {
-            const authUrl = `${DWAAR_CONFIG.dwaarUrl}/o/authenticate?` +
-                `client_id=${encodeURIComponent(DWAAR_CONFIG.clientId)}&` +
-                `redirect_uri=${encodeURIComponent(DWAAR_CONFIG.redirectUri)}&` +
-                `response_type=code&` +
-                `scope=openid profile email`;
-
-            window.location.href = authUrl;
-        }
-
-      
-    </script>
 </body>
 </html>

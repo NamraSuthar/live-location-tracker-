@@ -10,6 +10,7 @@ class LocationTracker {
         this.currentUserId = null;
         this.watchId = null;
         this.users = new Map(); // userId -> user data
+        this.currentUser = null; // Authenticated user
 
         this.LOCATION_UPDATE_INTERVAL = 5000; // 5 seconds
         this.BACKEND_URL = this.getBackendUrl();
@@ -25,6 +26,8 @@ class LocationTracker {
             totalUsers: document.getElementById('total-users'),
             lastUpdate: document.getElementById('last-update'),
             notification: document.getElementById('notification'),
+            authBtn: document.getElementById('auth-btn'),
+            userInfo: document.getElementById('user-info'),
         };
 
         this.init();
@@ -33,6 +36,9 @@ class LocationTracker {
 
     async init() {
         try {
+            // Check authentication first
+            await this.checkAuth();
+            
             this.validateSetup();
             await this.initializeMap();
             this.setupSocketIO();
@@ -41,6 +47,58 @@ class LocationTracker {
         } catch (error) {
             console.error('Initialization failed:', error);
             this.showNotification(`Initialization failed: ${error.message}`, 'error');
+        }
+    }
+
+    async checkAuth() {
+        try {
+            const response = await fetch(`${this.BACKEND_URL}/auth/me`, {
+                credentials: 'include', // Include cookies for session
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.currentUser = data.user;
+                this.updateAuthUI();
+            } else if (response.status === 401) {
+                // Not authenticated, redirect to login
+                console.log('Not authenticated, redirecting to login...');
+                this.redirectToLogin();
+            } else {
+                throw new Error(`Auth check failed: ${response.status}`);
+            }
+        } catch (error) {
+            console.error('Auth check error:', error);
+            this.redirectToLogin();
+        }
+    }
+
+    redirectToLogin() {
+        window.location.href = `${this.BACKEND_URL}/auth/login`;
+    }
+
+    logout() {
+        fetch(`${this.BACKEND_URL}/auth/logout`, {
+            credentials: 'include',
+        })
+        .then(() => {
+            window.location.href = '/';
+        })
+        .catch(error => {
+            console.error('Logout error:', error);
+            window.location.href = '/';
+        });
+    }
+
+    updateAuthUI() {
+        if (this.currentUser && this.elements.userInfo) {
+            this.elements.userInfo.textContent = `Logged in as: ${this.currentUser.name || this.currentUser.email}`;
+            this.elements.userInfo.style.display = 'block';
+        }
+
+        if (this.elements.authBtn) {
+            this.elements.authBtn.textContent = 'Logout';
+            this.elements.authBtn.onclick = () => this.logout();
         }
     }
 
@@ -65,7 +123,7 @@ class LocationTracker {
             this.getUrlParameter('token');
 
         if (!token) {
-            console.warn('No JWT token found. Please authenticate first.');
+            console.warn('No JWT token found. Session-based auth will be used.');
         }
 
         return token;
@@ -106,6 +164,7 @@ class LocationTracker {
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
             reconnectionAttempts: 5,
+            withCredentials: true, // Include cookies for session
         };
 
         if (this.JWT_TOKEN) {
@@ -125,7 +184,8 @@ class LocationTracker {
 
     onSocketConnect() {
         console.log('Socket.IO connected:', this.socket.id);
-        this.currentUserId = this.socket.id;
+        // Use authenticated user's sub (subject) if available, otherwise socket.id
+        this.currentUserId = this.currentUser?.sub || this.socket.id;
         this.updateConnectionStatus(true);
         this.showNotification('Connected to server', 'success');
     }
@@ -375,10 +435,14 @@ class LocationTracker {
 
 
     setupEventListeners() {
-        const { startBtn, stopBtn } = this.elements;
+        const { startBtn, stopBtn, authBtn } = this.elements;
 
         startBtn.addEventListener('click', () => this.startTracking());
         stopBtn.addEventListener('click', () => this.stopTracking());
+        
+        if (authBtn) {
+            authBtn.addEventListener('click', () => this.logout());
+        }
 
         // Handle page unload
         window.addEventListener('beforeunload', () => {

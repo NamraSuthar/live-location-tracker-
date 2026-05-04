@@ -2,9 +2,11 @@ import "dotenv/config"
 import http from "http"
 import express from "express";
 import cors from "cors"
+import session from "express-session"
 import { Server } from "socket.io"
 
 import healthRouter from "./routes/health.routes.js";
+import authRouter from "./routes/auth.routes.js";
 import { notFoundHandler } from "./middleware/notFound.middleware.js";
 import { errorHandler } from "./middleware/error.middleware.js";
 import { socketAuthMiddleware } from "./sockets/auth.socket.js";
@@ -92,6 +94,30 @@ io.on("connection", (socket) => {
 app.use(cors())
 app.use(express.json())
 
+// Session middleware
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "dev-secret-change-this",
+    resave: false,
+    saveUninitialized: true,
+    cookie: { 
+      secure: false, // Set to true in production with HTTPS
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    },
+  })
+)
+
+app.get("/auth/config", (req, res) => {
+    res.json({
+        dwaarUrl: process.env.DWAAR_ISSUER_URL,
+        clientId: process.env.DWAAR_CLIENT_ID,
+        redirectUri: process.env.DWAAR_REDIRECT_URI,
+        authorizationEndpoint: process.env.DWAAR_AUTHORIZATION_ENDPOINT,
+        tokenEndpoint: process.env.DWAAR_TOKEN_ENDPOINT,
+    })
+})
+
 app.get("/", (req, res) => {
     res.json({
         Message: "chalo......"
@@ -99,12 +125,10 @@ app.get("/", (req, res) => {
 })
 
 app.use("/health", healthRouter)
+app.use("/auth", authRouter)
 
 app.use(notFoundHandler)
 app.use(errorHandler)
-
-
-
 
 const startServer = async () => {
     const listenOnPort = (port) =>
@@ -150,7 +174,7 @@ const startServer = async () => {
         await runConsumer(io).catch((err) => console.warn("Consumer run warning:", err.message))
         await startDBConsumer().catch((err) => console.warn("DB Consumer warning:", err.message))
     } else {
-        console.log("⚠️  Kafka not configured - using direct Socket.IO broadcast")
+        console.log(" Kafka not configured - using direct Socket.IO broadcast")
     }
 }
 

@@ -1,9 +1,29 @@
 // Auth configuration
-const AUTH_CONFIG = {
-    dwaarUrl: 'https://dwaar-okjc.onrender.com', // Your Dwaar server URL
-    clientId: 'c1e631353cf23a4bbca6e371f14babe1', // Get from Dwaar
-    redirectUri: 'https://trackkar-client.onrender.com/'
-};
+let AUTH_CONFIG = null;
+
+function getBackendUrl() {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return 'http://localhost:5000';
+    }
+
+    return 'https://trackkar-server.onrender.com';
+}
+
+async function getAuthConfig() {
+    if (AUTH_CONFIG) {
+        return AUTH_CONFIG;
+    }
+
+    const response = await fetch(`${getBackendUrl()}/auth/config`);
+
+    if (!response.ok) {
+        throw new Error(`Unable to load auth config (${response.status})`);
+    }
+
+    AUTH_CONFIG = await response.json();
+
+    return AUTH_CONFIG;
+}
 
 // Check if user is authenticated
 function isAuthenticated() {
@@ -37,15 +57,17 @@ async function handleAuthCallback() {
 
     if (code) {
         try {
+            const authConfig = await getAuthConfig();
+
             // Exchange code for token
-            const response = await fetch(`${AUTH_CONFIG.dwaarUrl}/o/token`, {
+            const response = await fetch(authConfig.tokenEndpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     grant_type: 'authorization_code',
                     code: code,
-                    client_id: AUTH_CONFIG.clientId,
-                    redirect_uri: AUTH_CONFIG.redirectUri
+                    client_id: authConfig.clientId,
+                    redirect_uri: authConfig.redirectUri
                 })
             });
 
@@ -64,6 +86,23 @@ async function handleAuthCallback() {
             alert('Authentication failed. Please try again.');
             window.location.href = '/login.html';
         }
+    }
+}
+
+async function loginWithDwaar() {
+    try {
+        const authConfig = await getAuthConfig();
+
+        const authUrl = `${authConfig.authorizationEndpoint}?` +
+            `client_id=${encodeURIComponent(authConfig.clientId)}&` +
+            `redirect_uri=${encodeURIComponent(authConfig.redirectUri)}&` +
+            `response_type=code&` +
+            `scope=openid profile email`;
+
+        window.location.href = authUrl;
+    } catch (error) {
+        console.error('Unable to start login:', error);
+        alert('Unable to load login configuration. Please try again.');
     }
 }
 

@@ -13,6 +13,13 @@ const getKey = (header, callback) => {
 };
 
 export const socketAuthMiddleware = (socket, next) => {
+  // First check session-based auth
+  if (socket.request.session && socket.request.session.user) {
+    socket.user = socket.request.session.user;
+    return next();
+  }
+
+  // Fall back to token-based auth
   const token = socket.handshake.auth?.token;
 
   // Dev mode - skip JWT if not provided
