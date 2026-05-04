@@ -58,7 +58,9 @@ function handleAuthCallback() {
 
 async function loginWithDwaar() {
     try {
-        window.location.href = `${getBackendUrl()}/auth/login`;
+        const currentPage = window.location.pathname + window.location.search;
+        const returnTo = encodeURIComponent(currentPage);
+        window.location.href = `${getBackendUrl()}/auth/login?returnTo=${returnTo}`;
     } catch (error) {
         console.error('Unable to start login:', error);
         alert('Unable to load login configuration. Please try again.');

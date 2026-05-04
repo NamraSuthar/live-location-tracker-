@@ -72,7 +72,8 @@ class LocationTracker {
     }
 
     redirectToLogin() {
-        window.location.href = `${this.BACKEND_URL}/auth/login`;
+        const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.href = `${this.BACKEND_URL}/auth/login?returnTo=${returnTo}`;
     }
 
     logout() {

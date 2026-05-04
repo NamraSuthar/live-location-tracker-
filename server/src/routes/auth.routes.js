@@ -29,10 +29,20 @@ async function getOIDCClient() {
 router.get("/login", async (req, res) => {
   try {
     const oidcClient = await getOIDCClient();
-    
+    let returnTo = req.query.returnTo || "";
+
+    if (!returnTo || returnTo.includes("login.html")) {
+      returnTo = process.env.CLIENT_APP_URL || "http://localhost:8000/index.html";
+    }
+
+    const state = JSON.stringify({
+      nonce: Math.random().toString(36).substring(7),
+      returnTo: returnTo
+    });
+
     const authorizationUrl = oidcClient.authorizationUrl({
       scope: "openid profile email",
-      state: Math.random().toString(36).substring(7),
+      state: Buffer.from(state).toString('base64'),
       nonce: Math.random().toString(36).substring(7),
     });
 
@@ -54,11 +64,6 @@ router.get("/callback", async (req, res) => {
     }
 
     const oidcClient = await getOIDCClient();
-    const params = new URLSearchParams({
-      code,
-      state,
-      redirect_uri: process.env.DWAAR_REDIRECT_URI,
-    });
 
     // Exchange code for tokens
     const tokenSet = await oidcClient.callback(
@@ -81,13 +86,27 @@ router.get("/callback", async (req, res) => {
       refreshToken: tokenSet.refresh_token,
     };
 
+    let returnTo = process.env.CLIENT_APP_URL || "http://localhost:8000/index.html";
+
+    // Extract returnTo from state if available
+    try {
+      if (state) {
+        const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
+        if (stateData.returnTo) {
+          returnTo = stateData.returnTo;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to parse state:", e);
+    }
+
     // Save session before redirecting
     req.session.save((err) => {
       if (err) {
         console.error('Session save error:', err);
         return res.status(500).json({ error: "Failed to save session" });
       }
-      res.redirect(process.env.CLIENT_APP_URL || "http://localhost:8000/index.html");
+      res.redirect(returnTo);
     });
   } catch (error) {
     console.error("Callback error:", error);
