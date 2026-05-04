@@ -1,18 +1,15 @@
-
-
 class LocationTracker {
     constructor() {
         this.socket = null;
         this.map = null;
-        this.userMarkers = new Map(); 
+        this.userMarkers = new Map();
+        this.users = new Map();
 
         this.isTracking = false;
         this.currentUserId = null;
+        this.currentUser = null;
         this.watchId = null;
-        this.users = new Map(); // userId -> user data
-        this.currentUser = null; // Authenticated user
 
-        this.LOCATION_UPDATE_INTERVAL = 5000; // 5 seconds
         this.BACKEND_URL = this.getBackendUrl();
         this.JWT_TOKEN = this.getJwtToken();
 
@@ -26,19 +23,15 @@ class LocationTracker {
             totalUsers: document.getElementById('total-users'),
             lastUpdate: document.getElementById('last-update'),
             notification: document.getElementById('notification'),
-            authBtn: document.getElementById('auth-btn'),
             userInfo: document.getElementById('user-info'),
         };
 
         this.init();
     }
 
-
     async init() {
         try {
-            // Check authentication first
             await this.checkAuth();
-            
             this.validateSetup();
             await this.initializeMap();
             this.setupSocketIO();
@@ -53,23 +46,28 @@ class LocationTracker {
     async checkAuth() {
         try {
             const response = await fetch(`${this.BACKEND_URL}/auth/me`, {
-                credentials: 'include', // Include cookies for session
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
             });
 
             if (response.ok) {
                 const data = await response.json();
                 this.currentUser = data.user;
                 this.updateAuthUI();
-            } else if (response.status === 401) {
-                // Not authenticated, redirect to login
-                console.log('Not authenticated, redirecting to login...');
-                this.redirectToLogin();
-            } else {
-                throw new Error(`Auth check failed: ${response.status}`);
+                return;
             }
+
+            if (response.status === 401) {
+                this.showLoginButton();
+                return;
+            }
+
+            throw new Error(`Auth check failed: ${response.status}`);
         } catch (error) {
             console.error('Auth check error:', error);
-            this.redirectToLogin();
+            this.showLoginButton();
         }
     }
 
@@ -80,25 +78,48 @@ class LocationTracker {
     logout() {
         fetch(`${this.BACKEND_URL}/auth/logout`, {
             credentials: 'include',
-        })
-        .then(() => {
-            window.location.href = '/';
-        })
-        .catch(error => {
-            console.error('Logout error:', error);
+        }).finally(() => {
             window.location.href = '/';
         });
     }
 
     updateAuthUI() {
-        if (this.currentUser && this.elements.userInfo) {
-            this.elements.userInfo.textContent = `Logged in as: ${this.currentUser.name || this.currentUser.email}`;
-            this.elements.userInfo.style.display = 'block';
+        const userInfo = this.elements.userInfo;
+
+        if (!userInfo || !this.currentUser) {
+            return;
         }
 
-        if (this.elements.authBtn) {
-            this.elements.authBtn.textContent = 'Logout';
-            this.elements.authBtn.onclick = () => this.logout();
+        const userName = this.currentUser.name || this.currentUser.email || 'User';
+        userInfo.innerHTML = `
+            <div class="user-info-content">
+                <span class="user-name">${userName}</span>
+                <button id="logout-btn" class="btn btn-logout" type="button">Logout</button>
+            </div>
+        `;
+        userInfo.style.display = 'block';
+
+        const logoutBtn = document.getElementById('logout-btn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => this.logout());
+        }
+    }
+
+    showLoginButton() {
+        const userInfo = this.elements.userInfo;
+
+        if (!userInfo) {
+            return;
+        }
+
+        userInfo.innerHTML = `
+            <button id="login-btn" class="btn btn-secondary" type="button">Login</button>
+        `;
+        userInfo.style.display = 'block';
+
+        const loginBtn = document.getElementById('login-btn');
+        if (loginBtn) {
+            loginBtn.addEventListener('click', () => this.redirectToLogin());
         }
     }
 
@@ -109,32 +130,23 @@ class LocationTracker {
     }
 
     getBackendUrl() {
-        // Production
-        if (window.location.hostname !== 'localhost') {
+        if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
             return 'https://trackkar-server.onrender.com';
         }
-        // Local dev
+
         return 'http://localhost:5000';
     }
 
     getJwtToken() {
-        const token = localStorage.getItem('jwt_token') ||
+        return localStorage.getItem('jwt_token') ||
             sessionStorage.getItem('jwt_token') ||
             this.getUrlParameter('token');
-
-        if (!token) {
-            console.warn('No JWT token found. Session-based auth will be used.');
-        }
-
-        return token;
     }
 
     getUrlParameter(name) {
         const url = new URL(window.location);
         return url.searchParams.get(name);
     }
-
- 
 
     initializeMap() {
         return new Promise((resolve, reject) => {
@@ -148,7 +160,6 @@ class LocationTracker {
                 }).addTo(this.map);
 
                 this.elements.map.style.backgroundColor = '#f0f0f0';
-
                 resolve();
             } catch (error) {
                 reject(new Error(`Map initialization failed: ${error.message}`));
@@ -156,15 +167,13 @@ class LocationTracker {
         });
     }
 
-  
-
     setupSocketIO() {
         const socketOptions = {
             reconnection: true,
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
             reconnectionAttempts: 5,
-            withCredentials: true, // Include cookies for session
+            withCredentials: true,
         };
 
         if (this.JWT_TOKEN) {
@@ -172,26 +181,19 @@ class LocationTracker {
         }
 
         this.socket = io(this.BACKEND_URL, socketOptions);
-
-        // Connection events
         this.socket.on('connect', () => this.onSocketConnect());
         this.socket.on('disconnect', () => this.onSocketDisconnect());
         this.socket.on('connect_error', (error) => this.onSocketError(error));
-
-        // Location events
         this.socket.on('receive-location', (data) => this.onReceiveLocation(data));
     }
 
     onSocketConnect() {
-        console.log('Socket.IO connected:', this.socket.id);
-        // Use authenticated user's sub (subject) if available, otherwise socket.id
         this.currentUserId = this.currentUser?.sub || this.socket.id;
         this.updateConnectionStatus(true);
         this.showNotification('Connected to server', 'success');
     }
 
     onSocketDisconnect() {
-        console.log('Socket.IO disconnected');
         this.updateConnectionStatus(false);
         this.stopTracking();
         this.showNotification('Disconnected from server', 'error');
@@ -203,23 +205,18 @@ class LocationTracker {
         this.showNotification(`Connection error: ${error.message}`, 'error');
     }
 
-
-
     async startTracking() {
-        if (this.isTracking) return;
+        if (this.isTracking) {
+            return;
+        }
 
         try {
-            // Request geolocation permission
             const position = await this.getCurrentLocation();
-
             this.isTracking = true;
             this.updateTrackingUI();
             this.showNotification('Location tracking started', 'success');
-
-            // Send initial location
             this.sendLocation(position.coords.latitude, position.coords.longitude);
 
-            // Set up continuous updates
             this.watchId = navigator.geolocation.watchPosition(
                 (position) => {
                     const { latitude, longitude } = position.coords;
@@ -254,7 +251,6 @@ class LocationTracker {
 
     sendLocation(latitude, longitude) {
         if (!this.socket || !this.socket.connected) {
-            console.warn('Socket not connected, cannot send location');
             return;
         }
 
@@ -262,12 +258,12 @@ class LocationTracker {
             latitude,
             longitude,
         });
-
-        console.log(`Location sent: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
     }
 
     stopTracking() {
-        if (!this.isTracking) return;
+        if (!this.isTracking) {
+            return;
+        }
 
         if (this.watchId !== null) {
             navigator.geolocation.clearWatch(this.watchId);
@@ -279,12 +275,9 @@ class LocationTracker {
         this.showNotification('Location tracking stopped', 'success');
     }
 
-  
-
     onReceiveLocation(data) {
         const { userId, latitude, longitude, timeStamp } = data;
 
-        // Update user data
         this.users.set(userId, {
             userId,
             latitude,
@@ -292,23 +285,16 @@ class LocationTracker {
             timeStamp,
         });
 
-        // Update map marker
         this.updateMarker(userId, latitude, longitude);
-
-        // Update UI
         this.updateUsersList();
         this.updateLastUpdateTime();
-
-        console.log(`Location received from ${userId}: ${latitude}, ${longitude}`);
     }
 
     updateMarker(userId, latitude, longitude) {
-        // Remove old marker if exists
         if (this.userMarkers.has(userId)) {
             this.map.removeLayer(this.userMarkers.get(userId));
         }
 
-        // Create new marker with custom icon
         const icon = this.createMarkerIcon(userId === this.currentUserId);
         const marker = L.marker([latitude, longitude], { icon })
             .bindPopup(this.createPopupContent(userId, latitude, longitude))
@@ -343,7 +329,6 @@ class LocationTracker {
         `;
     }
 
-
     updateConnectionStatus(connected) {
         const statusDot = this.elements.statusDot;
         const statusText = this.elements.statusText;
@@ -361,23 +346,13 @@ class LocationTracker {
 
     updateTrackingUI() {
         const { startBtn, stopBtn } = this.elements;
-
-        if (this.isTracking) {
-            startBtn.disabled = true;
-            stopBtn.disabled = false;
-        } else {
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-        }
+        startBtn.disabled = this.isTracking;
+        stopBtn.disabled = !this.isTracking;
     }
 
     updateUsersList() {
         const { usersList, totalUsers } = this.elements;
-
-        // Update total users count
         totalUsers.textContent = this.users.size;
-
-        // Clear and rebuild users list
         usersList.innerHTML = '';
 
         if (this.users.size === 0) {
@@ -403,8 +378,7 @@ class LocationTracker {
     }
 
     updateLastUpdateTime() {
-        const { lastUpdate } = this.elements;
-        lastUpdate.textContent = new Date().toLocaleTimeString();
+        this.elements.lastUpdate.textContent = new Date().toLocaleTimeString();
     }
 
     getTimeAgo(timestamp) {
@@ -425,26 +399,19 @@ class LocationTracker {
 
         notification.textContent = message;
         notification.className = `notification ${type}`;
+        notification.classList.remove('hidden');
 
-        // Auto-hide after 4 seconds
         setTimeout(() => {
             notification.classList.add('hidden');
         }, 4000);
     }
 
-
-
     setupEventListeners() {
-        const { startBtn, stopBtn, authBtn } = this.elements;
+        const { startBtn, stopBtn } = this.elements;
 
         startBtn.addEventListener('click', () => this.startTracking());
         stopBtn.addEventListener('click', () => this.stopTracking());
-        
-        if (authBtn) {
-            authBtn.addEventListener('click', () => this.logout());
-        }
 
-        // Handle page unload
         window.addEventListener('beforeunload', () => {
             this.stopTracking();
             if (this.socket) {
@@ -454,8 +421,6 @@ class LocationTracker {
     }
 }
 
-
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM loaded, initializing Location Tracker...');
     new LocationTracker();
 });

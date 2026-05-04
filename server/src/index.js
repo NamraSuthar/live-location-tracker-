@@ -23,8 +23,9 @@ const server = http.createServer(app)
 
 const io = new Server(server, {
     cors: {
-        origin: ["http://localhost:8000", "https://trackkar-client.onrender.com"],
-        methods: ["GET", "POST"]
+        origin: ["http://localhost:8000", "http://localhost:3000", "https://trackkar-client.onrender.com"],
+        methods: ["GET", "POST"],
+        credentials: true
     }
 })
 
@@ -91,7 +92,11 @@ io.on("connection", (socket) => {
 
 
 
-app.use(cors())
+// CORS with credentials support
+app.use(cors({
+  origin: ["http://localhost:8000", "http://localhost:3000", "https://trackkar-client.onrender.com"],
+  credentials: true
+}))
 app.use(express.json())
 
 // Session middleware
@@ -99,10 +104,11 @@ app.use(
   session({
     secret: process.env.SESSION_SECRET || "dev-secret-change-this",
     resave: false,
-    saveUninitialized: true,
+    saveUninitialized: false,
     cookie: { 
       secure: false, // Set to true in production with HTTPS
       httpOnly: true,
+      sameSite: 'lax',
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     },
   })

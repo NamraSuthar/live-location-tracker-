@@ -81,7 +81,14 @@ router.get("/callback", async (req, res) => {
       refreshToken: tokenSet.refresh_token,
     };
 
-    res.redirect("/");
+    // Save session before redirecting
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({ error: "Failed to save session" });
+      }
+      res.redirect("/");
+    });
   } catch (error) {
     console.error("Callback error:", error);
     res.status(500).json({ error: "Callback failed" });

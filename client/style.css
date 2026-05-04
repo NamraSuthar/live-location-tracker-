@@ -21,28 +21,27 @@ body {
 /* Header */
 .header {
     background-color: #ffffff;
-    color: #000000;
+    color: #666666;
     padding: 1rem 2rem;
-    border-bottom: 3px solid #000000;
 }
 
-.header-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    max-width: 1400px;
-    margin: 0 auto;
-    width: 100%;
-}
-
-.header-left {
+.user-info-content {
     display: flex;
     align-items: center;
     gap: 1rem;
+    padding: 0.5rem 0;
 }
 
-.header-logo {
-    height: 100px;
+.user-info-content .user-name {
+    font-size: 0.95rem;
+    color: #000000;
+    font-weight: 500;
+}
+
+.btn-logout {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    border-bottom: 3px solid #000000;
     width: auto;
     object-fit: contain;
 }
@@ -93,6 +92,24 @@ body {
     font-size: 0.9rem;
     color: #fcfcfc;
     white-space: nowrap;
+
+.user-info-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 0;
+}
+
+.user-info-content .user-name {
+    font-size: 0.95rem;
+    color: #000000;
+    font-weight: 500;
+}
+
+.btn-logout {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+}
 }
 
 @keyframes pulse {
