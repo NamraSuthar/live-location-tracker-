@@ -23,6 +23,9 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const START_PORT = Number(process.env.PORT ?? 5000);
 
+// Trust first proxy for Render / Cloud deployment HTTPS cookies
+app.set("trust proxy", 1);
+
 const server = http.createServer(app);
 
 // Configure express-session middleware
@@ -33,7 +36,7 @@ const sessionMiddleware = session({
   cookie: {
     secure: process.env.NODE_ENV === "production", // HTTPS only in production
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   },
 });

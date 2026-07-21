@@ -29,6 +29,7 @@ router.get("/login", (req, res) => {
 
 router.get("/callback", async (req, res) => {
   const { code, state } = req.query;
+  const sessionState = req.session.oidcState;
 
   if (!code || !state) {
     return res.status(400).json({
@@ -36,11 +37,15 @@ router.get("/callback", async (req, res) => {
     });
   }
 
-  if (state !== req.session.oidcState) {
+  if (!sessionState || state !== sessionState) {
     return res.status(400).json({
       message: "Invalid state.",
     });
   }
+
+  // Clear state and nonce after state validation
+  delete req.session.oidcState;
+  delete req.session.oidcNonce;
 
   try {
     const tokenResponse = await fetch(process.env.DWAAR_TOKEN_ENDPOINT, {
