@@ -1,134 +1,132 @@
 import express from "express";
-import { Issuer } from "openid-client";
+import crypto from "crypto";
+
 import { requireAuth } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
-let client = null;
-
-// Initialize OIDC client on first use
-async function getOIDCClient() {
-  if (client) {
-    return client;
-  }
-
-  const issuer = await Issuer.discover(process.env.DWAAR_ISSUER_URL);
-  
-  client = new issuer.Client({
-    client_id: process.env.DWAAR_CLIENT_ID,
-    client_secret: process.env.DWAAR_CLIENT_SECRET,
-    redirect_uris: [process.env.DWAAR_REDIRECT_URI],
-    response_types: ["code"],
-  });
-
-  return client;
-}
 
 // @route   GET /auth/login
 // @desc    Redirect to OIDC provider
-router.get("/login", async (req, res) => {
-  try {
-    const oidcClient = await getOIDCClient();
-    let returnTo = req.query.returnTo || "";
+router.get("/login", (req, res) => {
+  const state = crypto.randomUUID();
+  const nonce = crypto.randomUUID();
 
-    if (!returnTo || returnTo.includes("login.html")) {
-      returnTo = process.env.CLIENT_APP_URL || "http://localhost:8000/index.html";
-    }
+  req.session.oidcState = state;
+  req.session.oidcNonce = nonce;
 
-    const state = JSON.stringify({
-      nonce: Math.random().toString(36).substring(7),
-      returnTo: returnTo
-    });
+  const authUrl =
+    `${process.env.DWAAR_AUTHORIZATION_ENDPOINT}?` +
+    `client_id=${encodeURIComponent(process.env.DWAAR_CLIENT_ID)}&` +
+    `redirect_uri=${encodeURIComponent(process.env.DWAAR_REDIRECT_URI)}&` +
+    `response_type=code&` +
+    `scope=${encodeURIComponent("openid profile email")}&` +
+    `state=${encodeURIComponent(state)}&` +
+    `nonce=${encodeURIComponent(nonce)}`;
 
-    const authorizationUrl = oidcClient.authorizationUrl({
-      scope: "openid profile email",
-      state: Buffer.from(state).toString('base64'),
-      nonce: Math.random().toString(36).substring(7),
-    });
-
-    res.redirect(authorizationUrl);
-  } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ error: "Login failed" });
-  }
+  return res.redirect(authUrl);
 });
 
-// @route   GET /auth/callback
-// @desc    OIDC callback endpoint
 router.get("/callback", async (req, res) => {
-  try {
-    const { code, state } = req.query;
+  const { code, state } = req.query;
 
-    if (!code) {
-      return res.status(400).json({ error: "No authorization code received" });
-    }
-
-    const oidcClient = await getOIDCClient();
-
-    // Exchange code for tokens
-    const tokenSet = await oidcClient.callback(
-      process.env.DWAAR_REDIRECT_URI,
-      { code, state }
-    );
-
-    // Get user info
-    const userInfo = await oidcClient.userinfo(tokenSet);
-
-    // Store in session
-    req.session.user = {
-      sub: userInfo.sub,
-      email: userInfo.email,
-      name: userInfo.name,
-    };
-
-    req.session.tokens = {
-      accessToken: tokenSet.access_token,
-      refreshToken: tokenSet.refresh_token,
-    };
-
-    let returnTo = process.env.CLIENT_APP_URL || "http://localhost:8000/index.html";
-
-    // Extract returnTo from state if available
-    try {
-      if (state) {
-        const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
-        if (stateData.returnTo) {
-          returnTo = stateData.returnTo;
-        }
-      }
-    } catch (e) {
-      console.warn("Failed to parse state:", e);
-    }
-
-    // Save session before redirecting
-    req.session.save((err) => {
-      if (err) {
-        console.error('Session save error:', err);
-        return res.status(500).json({ error: "Failed to save session" });
-      }
-      res.redirect(returnTo);
+  if (!code || !state) {
+    return res.status(400).json({
+      message: "Missing code or state in callback.",
     });
+  }
+
+  if (state !== req.session.oidcState) {
+    return res.status(400).json({
+      message: "Invalid state.",
+    });
+  }
+
+  try {
+    const tokenResponse = await fetch(process.env.DWAAR_TOKEN_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        grant_type: "authorization_code",
+        code,
+        client_id: process.env.DWAAR_CLIENT_ID,
+        client_secret: process.env.DWAAR_CLIENT_SECRET,
+        redirect_uri: process.env.DWAAR_REDIRECT_URI,
+      }),
+    });
+
+    const tokenData = await tokenResponse.json();
+
+    if (!tokenResponse.ok || !tokenData.access_token) {
+      return res.status(401).json({
+        message: "Token exchange failed.",
+        details: tokenData,
+      });
+    }
+
+    const userInfoResponse = await fetch(process.env.DWAAR_USERINFO_ENDPOINT, {
+      headers: {
+        Authorization: `Bearer ${tokenData.access_token}`,
+      },
+    });
+
+    const userInfo = await userInfoResponse.json();
+
+    if (!userInfoResponse.ok) {
+      return res.status(401).json({
+        message: "Failed to fetch user info.",
+        details: userInfo,
+      });
+    }
+
+    req.session.user = userInfo;
+    req.session.accessToken = tokenData.access_token;
+    req.session.refreshToken = tokenData.refresh_token;
+
+    const clientUrl = process.env.CLIENT_APP_URL || "http://localhost:8000/";
+    return res.redirect(clientUrl);
   } catch (error) {
-    console.error("Callback error:", error);
-    res.status(500).json({ error: "Callback failed" });
+    return res.status(500).json({
+      message: "Authentication callback failed.",
+      error: error.message,
+    });
   }
 });
 
-// @route   GET /auth/logout
+// @route   GET / POST /auth/logout
 // @desc    Logout user
-router.get("/logout", (req, res) => {
+const handleLogout = (req, res) => {
   req.session.destroy((err) => {
     if (err) {
       return res.status(500).json({ error: "Logout failed" });
     }
-    res.redirect(process.env.CLIENT_APP_URL ? `${process.env.CLIENT_APP_URL}/login.html` : "http://localhost:8000/login.html");
+
+    res.clearCookie("connect.sid");
+
+    if (req.method === "GET") {
+      const clientUrl =
+        process.env.CLIENT_APP_URL
+          ? `${process.env.CLIENT_APP_URL}/login.html`
+          : "http://localhost:8000/login.html";
+      return res.redirect(clientUrl);
+    }
+
+    return res.json({
+      message: "Logged out successfully",
+    });
   });
-});
+};
+
+router.get("/logout", handleLogout);
+router.post("/logout", handleLogout);
 
 // @route   GET /me
 // @desc    Get current user info
 router.get("/me", requireAuth, (req, res) => {
   res.json({
+    authenticated: true,
     user: req.session.user,
   });
 });

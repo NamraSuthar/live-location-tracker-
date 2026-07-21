@@ -4,105 +4,126 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TrackKar</title>
+    <title>TrackKar - Real-Time Location Tracker</title>
     <link rel="stylesheet" href="style.css">
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 </head>
 
 <body>
     <div class="container">
-        <!-- Header -->
+        <!-- Header Navbar -->
         <header class="header">
             <div class="header-content">
                 <div class="header-left">
                     <img src="logo/TrackKar logo.png" alt="TrackKar Logo" class="header-logo">
-                    <h1>TrackKar</h1>
+                    <div class="header-title-wrapper">
+                        <h1>TrackKar</h1>
+                        <span class="version-badge">LIVE TRACKER</span>
+                    </div>
                 </div>
+                
                 <div class="header-right">
-                    
-                </div>
-                <div class="status-indicator">
-                    <span id="connection-status" class="status-dot disconnected"></span>
-                    <span id="connection-text">Disconnected</span>
+                    <div id="user-info" class="user-info"></div>
+                    <div class="status-indicator">
+                        <span id="connection-status" class="status-dot disconnected"></span>
+                        <span id="connection-text">Disconnected</span>
+                    </div>
                 </div>
             </div>
         </header>
 
-        <!-- Main Content -->
+        <!-- Main Content Layout -->
         <main class="main-content">
-            <!-- Map Container -->
-            <div id="map" class="map-container"></div>
+            <!-- Map Workspace -->
+            <div class="map-container">
+                <!-- Floating Telemetry HUD Overlay -->
+                <div class="map-hud-overlay">
+                    <div class="hud-card">
+                        <span class="hud-label">GPS Position</span>
+                        <span id="hud-coordinates" class="hud-value">Waiting for GPS...</span>
+                    </div>
+                    <button id="recenter-map-btn" class="recenter-btn">
+                        <span>🎯 Recenter My Location</span>
+                    </button>
+                </div>
 
-            <!-- Control Panel -->
-            <div class="control-panel">
-                <div class="control-section">
-                    <h2>Settings</h2>
+                <div id="map"></div>
+            </div>
+
+            <!-- Control Panel Sidebar -->
+            <aside class="control-panel">
+                <!-- Tracking Controls -->
+                <section class="control-section">
+                    <div class="section-header">
+                        <h2><span>📡</span> Live Tracking</h2>
+                        <span id="tracking-state-badge" class="section-badge">Offline</span>
+                    </div>
                     <div class="control-group">
                         <button id="start-tracking-btn" class="btn btn-primary">
-                            Start Tracking
+                            <span>▶</span> Start Broadcasting
                         </button>
                         <button id="stop-tracking-btn" class="btn btn-secondary" disabled>
-                            Stop Tracking
+                            <span>⏹</span> Stop
                         </button>
                     </div>
-                </div>
+                </section>
 
-                <div class="control-section">
-                    <h2>Active Users</h2>
-                    <div id="users-list" class="users-list">
-                        <p class="empty-state">No users connected</p>
+                <!-- Active Connected Users -->
+                <section class="control-section">
+                    <div class="section-header">
+                        <h2><span>👥</span> Active Users</h2>
+                        <span id="active-count-badge" class="section-badge">0 Online</span>
                     </div>
-                </div>
+                    <div id="users-list" class="users-list">
+                        <div class="empty-state">
+                            <span class="empty-icon">📡</span>
+                            <p>No active users connected</p>
+                        </div>
+                    </div>
+                </section>
 
-                <div class="control-section">
-                    <h2>Statistics</h2>
-                    <div class="stats">
-                        <div class="stat-item">
-                            <span class="stat-label">Total Users:</span>
+                <!-- Real-Time Telemetry Statistics -->
+                <section class="control-section">
+                    <div class="section-header">
+                        <h2><span>📊</span> Live Telemetry</h2>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <span class="stat-title">Total Connected</span>
                             <span id="total-users" class="stat-value">0</span>
                         </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Last Update:</span>
+                        <div class="stat-card">
+                            <span class="stat-title">Last Ping Time</span>
                             <span id="last-update" class="stat-value">-</span>
                         </div>
+                        <div class="stat-card">
+                            <span class="stat-title">Pings Transmitted</span>
+                            <span id="update-count" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-title">Socket Stream</span>
+                            <span id="stream-status" class="stat-value">READY</span>
+                        </div>
                     </div>
-                </div>
-            </div>
+                </section>
+            </aside>
         </main>
     </div>
 
-    <!-- Notification Toast -->
+    <!-- Notification Toast Container -->
     <div id="notification" class="notification hidden"></div>
 
-    <script>
-        (async () => {
-            try {
-                const backendUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                    ? 'http://localhost:5000'
-                    : 'https://trackkar-server.onrender.com';
 
-                const response = await fetch(`${backendUrl}/auth/me`, {
-                    credentials: 'include'
-                });
-
-                if (response.status === 401) {
-                    window.location.href = '/login.html';
-                }
-            } catch (error) {
-                window.location.href = '/login.html';
-            }
-        })();
-    </script>
 
     <!-- Leaflet JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <!-- Socket.IO Client -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <!-- App JS -->
+    <!-- Auth Helper -->
+    <script src="auth.js"></script>
+    <!-- App Main JS -->
     <script src="app.js"></script>
 </body>
 

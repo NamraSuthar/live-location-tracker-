@@ -1,21 +1,18 @@
-import jwt from "jsonwebtoken"
-import jwksClient from "jwks-rsa"
+import jwt from "jsonwebtoken";
+import jwksClient from "jwks-rsa";
 
 const client = jwksClient({
-    jwksUri: process.env.DWAAR_JWKS_URI
-})
+  jwksUri: process.env.DWAAR_JWKS_URI,
+});
 
-const getKey = (header,callback)=>{
-    client.getSigningKey(header.kid, function(err,key){
-        if(err) return callback(err)
+const getKey = (header, callback) => {
+  client.getSigningKey(header.kid, function (err, key) {
+    if (err) return callback(err);
 
-            const signinKey = key.getPublicKey()
-            callback(null, signinKey)
-    })
-}
-
-
-
+    const signinKey = key.getPublicKey();
+    callback(null, signinKey);
+  });
+};
 
 export const authMiddleware = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -45,14 +42,19 @@ export const authMiddleware = (req, res, next) => {
       req.user = decoded;
 
       next();
-    }
+    },
   );
 };
 
 // Session-based authentication middleware
 export const requireAuth = (req, res, next) => {
   if (!req.session || !req.session.user) {
-    return res.status(401).json({ message: "Unauthorized - please login first" });
+    return res
+      .status(401)
+      .json({
+        authenticated: false,
+        message: "Unauthorized - please login first",
+      });
   }
 
   next();

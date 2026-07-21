@@ -9,9 +9,10 @@ class LocationTracker {
         this.currentUserId = null;
         this.currentUser = null;
         this.watchId = null;
+        this.updateCounter = 0;
+        this.lastPosition = null;
 
         this.BACKEND_URL = this.getBackendUrl();
-        this.JWT_TOKEN = this.getJwtToken();
 
         this.elements = {
             map: document.getElementById('map'),
@@ -24,6 +25,12 @@ class LocationTracker {
             lastUpdate: document.getElementById('last-update'),
             notification: document.getElementById('notification'),
             userInfo: document.getElementById('user-info'),
+            hudCoordinates: document.getElementById('hud-coordinates'),
+            recenterBtn: document.getElementById('recenter-map-btn'),
+            trackingStateBadge: document.getElementById('tracking-state-badge'),
+            activeCountBadge: document.getElementById('active-count-badge'),
+            updateCount: document.getElementById('update-count'),
+            streamStatus: document.getElementById('stream-status'),
         };
 
         this.init();
@@ -31,7 +38,14 @@ class LocationTracker {
 
     async init() {
         try {
-            await this.checkAuth();
+            const isAuthenticated = await this.checkAuth();
+
+            if (!isAuthenticated) {
+                this.updateConnectionStatus(false);
+                this.showNotification('Please login to continue', 'error');
+                return;
+            }
+
             this.validateSetup();
             await this.initializeMap();
             this.setupSocketIO();
@@ -52,35 +66,48 @@ class LocationTracker {
                 },
             });
 
+            console.log('Auth check response:', response.status);
+
             if (response.ok) {
                 const data = await response.json();
+                console.log('User authenticated:', data.user);
                 this.currentUser = data.user;
                 this.updateAuthUI();
-                return;
+                return true;
             }
 
             if (response.status === 401) {
+                console.log('User not authenticated (401)');
+                this.currentUser = null;
                 this.showLoginButton();
-                return;
+                return false;
             }
 
             throw new Error(`Auth check failed: ${response.status}`);
         } catch (error) {
             console.error('Auth check error:', error);
+            this.currentUser = null;
             this.showLoginButton();
+            return false;
         }
     }
 
     redirectToLogin() {
-        const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
-        window.location.href = `${this.BACKEND_URL}/auth/login?returnTo=${returnTo}`;
+        window.location.href = `${this.BACKEND_URL}/auth/login`;
     }
 
     logout() {
+        if (this.socket) {
+            this.socket.disconnect();
+            this.socket = null;
+        }
+
         fetch(`${this.BACKEND_URL}/auth/logout`, {
+            method: 'GET',
             credentials: 'include',
         }).finally(() => {
-            window.location.href = '/';
+            this.currentUser = null;
+            window.location.href = '/login.html';
         });
     }
 
@@ -92,13 +119,16 @@ class LocationTracker {
         }
 
         const userName = this.currentUser.name || this.currentUser.email || 'User';
+        const initial = userName.charAt(0).toUpperCase();
+
         userInfo.innerHTML = `
             <div class="user-info-content">
+                <div class="user-avatar">${initial}</div>
                 <span class="user-name">${userName}</span>
-                <button id="logout-btn" class="btn btn-logout" type="button">Logout</button>
+                <button id="logout-btn" class="btn-logout" type="button">Logout</button>
             </div>
         `;
-        userInfo.style.display = 'block';
+        userInfo.style.display = 'flex';
 
         const logoutBtn = document.getElementById('logout-btn');
         if (logoutBtn) {
@@ -138,29 +168,25 @@ class LocationTracker {
         return 'http://localhost:5000';
     }
 
-    getJwtToken() {
-        return localStorage.getItem('jwt_token') ||
-            sessionStorage.getItem('jwt_token') ||
-            this.getUrlParameter('token');
-    }
-
-    getUrlParameter(name) {
-        const url = new URL(window.location);
-        return url.searchParams.get(name);
-    }
-
     initializeMap() {
         return new Promise((resolve, reject) => {
             try {
-                this.map = L.map('map').setView([20, 0], 2);
+                this.map = L.map('map', {
+                    zoomControl: true,
+                }).setView([20, 0], 3);
 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors',
+                    attribution: '© OpenStreetMap contributors | TrackKar Radar',
                     maxZoom: 19,
                     minZoom: 2,
                 }).addTo(this.map);
 
-                this.elements.map.style.backgroundColor = '#f0f0f0';
+                setTimeout(() => {
+                    if (this.map) {
+                        this.map.invalidateSize();
+                    }
+                }, 200);
+
                 resolve();
             } catch (error) {
                 reject(new Error(`Map initialization failed: ${error.message}`));
@@ -169,6 +195,10 @@ class LocationTracker {
     }
 
     setupSocketIO() {
+        if (!this.currentUser) {
+            return;
+        }
+
         const socketOptions = {
             reconnection: true,
             reconnectionDelay: 1000,
@@ -176,10 +206,6 @@ class LocationTracker {
             reconnectionAttempts: 5,
             withCredentials: true,
         };
-
-        if (this.JWT_TOKEN) {
-            socketOptions.auth = { token: this.JWT_TOKEN };
-        }
 
         this.socket = io(this.BACKEND_URL, socketOptions);
         this.socket.on('connect', () => this.onSocketConnect());
@@ -191,19 +217,27 @@ class LocationTracker {
     onSocketConnect() {
         this.currentUserId = this.currentUser?.sub || this.socket.id;
         this.updateConnectionStatus(true);
-        this.showNotification('Connected to server', 'success');
+        if (this.elements.streamStatus) {
+            this.elements.streamStatus.textContent = 'CONNECTED';
+            this.elements.streamStatus.style.color = '#10b981';
+        }
+        this.showNotification('Connected to Socket.IO telemetry stream', 'success');
     }
 
     onSocketDisconnect() {
         this.updateConnectionStatus(false);
         this.stopTracking();
-        this.showNotification('Disconnected from server', 'error');
+        if (this.elements.streamStatus) {
+            this.elements.streamStatus.textContent = 'DISCONNECTED';
+            this.elements.streamStatus.style.color = '#ef4444';
+        }
+        this.showNotification('Disconnected from socket server', 'error');
     }
 
     onSocketError(error) {
         console.error('Socket.IO error:', error);
         this.updateConnectionStatus(false);
-        this.showNotification(`Connection error: ${error.message}`, 'error');
+        this.showNotification(`Socket error: ${error.message}`, 'error');
     }
 
     async startTracking() {
@@ -214,18 +248,29 @@ class LocationTracker {
         try {
             const position = await this.getCurrentLocation();
             this.isTracking = true;
+            this.lastPosition = position.coords;
+            
             this.updateTrackingUI();
-            this.showNotification('Location tracking started', 'success');
+            this.updateHUDCoordinates(position.coords.latitude, position.coords.longitude);
+            
+            this.map.flyTo([position.coords.latitude, position.coords.longitude], 15, {
+                animate: true,
+                duration: 1.5,
+            });
+
+            this.showNotification('Live location broadcasting active', 'success');
             this.sendLocation(position.coords.latitude, position.coords.longitude);
 
             this.watchId = navigator.geolocation.watchPosition(
                 (position) => {
                     const { latitude, longitude } = position.coords;
+                    this.lastPosition = position.coords;
+                    this.updateHUDCoordinates(latitude, longitude);
                     this.sendLocation(latitude, longitude);
                 },
                 (error) => {
                     console.error('Geolocation error:', error);
-                    this.showNotification(`Location error: ${error.message}`, 'error');
+                    this.showNotification(`GPS error: ${error.message}`, 'error');
                     this.stopTracking();
                 },
                 {
@@ -255,6 +300,11 @@ class LocationTracker {
             return;
         }
 
+        this.updateCounter++;
+        if (this.elements.updateCount) {
+            this.elements.updateCount.textContent = this.updateCounter;
+        }
+
         this.socket.emit('send-location', {
             latitude,
             longitude,
@@ -273,7 +323,7 @@ class LocationTracker {
 
         this.isTracking = false;
         this.updateTrackingUI();
-        this.showNotification('Location tracking stopped', 'success');
+        this.showNotification('Location broadcasting paused', 'success');
     }
 
     onReceiveLocation(data) {
@@ -296,7 +346,8 @@ class LocationTracker {
             this.map.removeLayer(this.userMarkers.get(userId));
         }
 
-        const icon = this.createMarkerIcon(userId === this.currentUserId);
+        const isCurrent = userId === this.currentUserId;
+        const icon = this.createMarkerIcon(isCurrent);
         const marker = L.marker([latitude, longitude], { icon })
             .bindPopup(this.createPopupContent(userId, latitude, longitude))
             .addTo(this.map);
@@ -306,26 +357,27 @@ class LocationTracker {
 
     createMarkerIcon(isCurrent) {
         const svgIcon = isCurrent
-            ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="black" width="24" height="24"><circle cx="12" cy="12" r="8"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/></svg>'
-            : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" width="24" height="24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></svg>';
+            ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32"><rect x="4" y="4" width="16" height="16" fill="#000000" stroke="#000000" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="#ffffff"/></svg>`
+            : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32"><rect x="4" y="4" width="16" height="16" fill="#ffffff" stroke="#000000" stroke-width="3"/><rect x="9" y="9" width="6" height="6" fill="#000000"/></svg>`;
 
         return L.icon({
             iconUrl: `data:image/svg+xml;base64,${btoa(svgIcon)}`,
             iconSize: [32, 32],
             iconAnchor: [16, 16],
-            popupAnchor: [0, -32],
+            popupAnchor: [0, -16],
         });
     }
 
     createPopupContent(userId, latitude, longitude) {
         const isCurrentUser = userId === this.currentUserId;
-        const label = isCurrentUser ? 'You' : `User: ${userId.substring(0, 8)}...`;
+        const label = isCurrentUser ? 'YOU (CURRENT DEVICE)' : `USER: ${userId.substring(0, 8)}`;
 
         return `
-            <div style="font-family: sans-serif; text-align: center; min-width: 150px;">
-                <strong>${label}</strong><br/>
-                <small>Lat: ${latitude.toFixed(6)}</small><br/>
-                <small>Lng: ${longitude.toFixed(6)}</small>
+            <div style="font-family: sans-serif; text-align: center; min-width: 140px; padding: 4px;">
+                <strong style="color: #000000; font-size: 0.85rem; text-transform: uppercase;">${label}</strong><br/>
+                <span style="font-size: 0.8rem; color: #333333; font-family: monospace; font-weight: bold;">
+                    ${latitude.toFixed(5)}, ${longitude.toFixed(5)}
+                </span>
             </div>
         `;
     }
@@ -337,7 +389,7 @@ class LocationTracker {
         if (connected) {
             statusDot.classList.remove('disconnected');
             statusDot.classList.add('connected');
-            statusText.textContent = 'Connected';
+            statusText.textContent = 'Live Connected';
         } else {
             statusDot.classList.remove('connected');
             statusDot.classList.add('disconnected');
@@ -346,53 +398,80 @@ class LocationTracker {
     }
 
     updateTrackingUI() {
-        const { startBtn, stopBtn } = this.elements;
+        const { startBtn, stopBtn, trackingStateBadge } = this.elements;
         startBtn.disabled = this.isTracking;
         stopBtn.disabled = !this.isTracking;
+
+        if (trackingStateBadge) {
+            if (this.isTracking) {
+                trackingStateBadge.textContent = 'Broadcasting';
+                trackingStateBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+                trackingStateBadge.style.color = '#10b981';
+            } else {
+                trackingStateBadge.textContent = 'Offline';
+                trackingStateBadge.style.background = 'rgba(255, 255, 255, 0.06)';
+                trackingStateBadge.style.color = '#a1a1aa';
+            }
+        }
+    }
+
+    updateHUDCoordinates(lat, lng) {
+        if (this.elements.hudCoordinates) {
+            this.elements.hudCoordinates.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        }
     }
 
     updateUsersList() {
-        const { usersList, totalUsers } = this.elements;
-        totalUsers.textContent = this.users.size;
+        const { usersList, totalUsers, activeCountBadge } = this.elements;
+        const count = this.users.size;
+
+        if (totalUsers) totalUsers.textContent = count;
+        if (activeCountBadge) activeCountBadge.textContent = `${count} Online`;
+
         usersList.innerHTML = '';
 
-        if (this.users.size === 0) {
-            usersList.innerHTML = '<p class="empty-state">No users connected</p>';
+        if (count === 0) {
+            usersList.innerHTML = `
+                <div class="empty-state">
+                    <span class="empty-icon">📡</span>
+                    <p>No active users connected</p>
+                </div>
+            `;
             return;
         }
 
         this.users.forEach((user) => {
-            const userItem = document.createElement('div');
-            userItem.className = 'user-item';
+            const userCard = document.createElement('div');
+            userCard.className = 'user-card';
 
             const isCurrentUser = user.userId === this.currentUserId;
-            const label = isCurrentUser ? 'You' : `User: ${user.userId.substring(0, 8)}...`;
+            const label = isCurrentUser ? 'You' : `User ${user.userId.substring(0, 6)}`;
+            const initial = isCurrentUser ? 'Y' : 'U';
 
-            userItem.innerHTML = `
-                <span class="user-name">${label}</span>
-                <span class="user-distance">${this.getTimeAgo(user.timeStamp)}</span>
-                <span class="user-status"></span>
+            userCard.innerHTML = `
+                <div class="user-card-info">
+                    <div class="user-card-avatar">${initial}</div>
+                    <div class="user-card-details">
+                        <span class="user-card-name">${label}</span>
+                        <span class="user-card-meta">${user.latitude.toFixed(4)}, ${user.longitude.toFixed(4)}</span>
+                    </div>
+                </div>
+                <button class="user-card-action" type="button">Focus</button>
             `;
 
-            usersList.appendChild(userItem);
+            const focusBtn = userCard.querySelector('.user-card-action');
+            focusBtn.addEventListener('click', () => {
+                this.map.flyTo([user.latitude, user.longitude], 16, { animate: true });
+            });
+
+            usersList.appendChild(userCard);
         });
     }
 
     updateLastUpdateTime() {
-        this.elements.lastUpdate.textContent = new Date().toLocaleTimeString();
-    }
-
-    getTimeAgo(timestamp) {
-        const now = Date.now();
-        const seconds = Math.floor((now - timestamp) / 1000);
-
-        if (seconds < 60) return 'now';
-        const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return `${minutes}m ago`;
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) return `${hours}h ago`;
-        const days = Math.floor(hours / 24);
-        return `${days}d ago`;
+        if (this.elements.lastUpdate) {
+            this.elements.lastUpdate.textContent = new Date().toLocaleTimeString();
+        }
     }
 
     showNotification(message, type = 'success') {
@@ -408,10 +487,25 @@ class LocationTracker {
     }
 
     setupEventListeners() {
-        const { startBtn, stopBtn } = this.elements;
+        const { startBtn, stopBtn, recenterBtn } = this.elements;
 
         startBtn.addEventListener('click', () => this.startTracking());
         stopBtn.addEventListener('click', () => this.stopTracking());
+
+        if (recenterBtn) {
+            recenterBtn.addEventListener('click', () => {
+                if (this.lastPosition) {
+                    this.map.flyTo([this.lastPosition.latitude, this.lastPosition.longitude], 16, { animate: true });
+                } else {
+                    this.getCurrentLocation().then(pos => {
+                        this.lastPosition = pos.coords;
+                        this.map.flyTo([pos.coords.latitude, pos.coords.longitude], 16, { animate: true });
+                    }).catch(err => {
+                        this.showNotification('Unable to fetch GPS position', 'error');
+                    });
+                }
+            });
+        }
 
         window.addEventListener('beforeunload', () => {
             this.stopTracking();

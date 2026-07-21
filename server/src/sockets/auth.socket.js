@@ -7,25 +7,25 @@ const client = jwksClient({
 
 const getKey = (header, callback) => {
   client.getSigningKey(header.kid, (err, key) => {
+    if (err) {
+      return callback(err);
+    }
+
     const signingKey = key.getPublicKey();
     callback(null, signingKey);
   });
 };
 
 export const socketAuthMiddleware = (socket, next) => {
-  // First check session-based auth
   if (socket.request.session && socket.request.session.user) {
     socket.user = socket.request.session.user;
     return next();
   }
 
-  // Fall back to token-based auth
   const token = socket.handshake.auth?.token;
 
-  // Dev mode - skip JWT if not provided
   if (!token) {
-    socket.user = { sub: socket.id };
-    return next();
+    return next(new Error("Authentication required"));
   }
 
   jwt.verify(
@@ -41,8 +41,7 @@ export const socketAuthMiddleware = (socket, next) => {
       }
 
       socket.user = decoded;
-
       next();
-    }
+    },
   );
 };

@@ -1,10 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TrackKar - Login</title>
+    <title>TrackKar - Sign In</title>
     <style>
+        :root {
+            --bg-main: #eaeaea;
+            --bg-card: #ffffff;
+            --border-black: #000000;
+            --text-main: #000000;
+            --shadow-hard-lg: 8px 8px 0px #000000;
+            --shadow-hard-md: 4px 4px 0px #000000;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -12,105 +22,167 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #f4f4f5 0%, #fafafa 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-main);
+            background-image: radial-gradient(#000000 0.75px, transparent 0.75px);
+            background-size: 16px 16px;
+            color: var(--text-main);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
+            padding: 1.5rem;
+            -webkit-font-smoothing: antialiased;
         }
 
-        .login-container {
-            background: white;
-            border-color: 5px solid #000;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-            padding: 40px;
-            max-width: 400px;
+        .login-card {
+            background: var(--bg-card);
+            border: 3px solid var(--border-black);
+            box-shadow: var(--shadow-hard-lg);
+            padding: 2.5rem;
+            max-width: 440px;
             width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
         }
 
-        .logo-section {
-            text-align: center;
-            margin-bottom: 30px;
+        .logo-wrapper {
+            margin-bottom: 1.25rem;
         }
 
         .logo {
-            height: 60px;
-            margin-bottom: 15px;
+            height: 64px;
+            width: auto;
+            object-fit: contain;
+            filter: grayscale(100%) contrast(200%);
         }
 
         h1 {
-            font-size: 28px;
-            color: #000;
-            margin-bottom: 10px;
+            font-size: 2rem;
+            font-weight: 900;
+            letter-spacing: -0.03em;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+            color: #000000;
         }
 
         .subtitle {
-            color: #666;
-            font-size: 14px;
+            color: #444444;
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 2rem;
+            line-height: 1.4;
+        }
+
+        .features-list {
+            width: 100%;
+            background: #f8f8f8;
+            border: 2px solid var(--border-black);
+            padding: 1.25rem;
+            margin-bottom: 2rem;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #000000;
+        }
+
+        .feature-icon {
+            font-weight: 900;
+            font-size: 1rem;
         }
 
         .login-button {
             width: 100%;
-            padding: 12px 20px;
-            margin-top: 30px;
-            background: linear-gradient(135deg, #0d0d0e 0%, #0c0c0c 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
+            padding: 0.95rem 1.5rem;
+            background: #000000;
+            color: #ffffff;
+            border: 2px solid #000000;
+            box-shadow: var(--shadow-hard-md);
+            font-size: 0.95rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
         }
 
         .login-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+            background: #ffffff;
+            color: #000000;
+            transform: translate(-2px, -2px);
+            box-shadow: 6px 6px 0px #000000;
         }
 
         .login-button:active {
-            transform: translateY(0);
+            transform: translate(0, 0);
+            box-shadow: 2px 2px 0px #000000;
         }
 
-        .divider {
-            text-align: center;
-            color: #999;
-            margin: 20px 0;
-            font-size: 12px;
-        }
-
-        .info {
-            background: #f5f5f5;
-            padding: 15px;
-            border-radius: 8px;
-            font-size: 13px;
-            color: #666;
-            margin-top: 20px;
-            line-height: 1.6;
+        .info-footer {
+            margin-top: 1.75rem;
+            font-size: 0.78rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #555555;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
         }
     </style>
 </head>
+
 <body>
-    <div class="login-container">
-        <div class="logo-section">
-            <img src="logo/TrackKar logo.png" alt="TrackKar" class="logo" style="max-height: 60px;">
-            <h1>TrackKar</h1>
-            <p class="subtitle">Real-time Location Tracking</p>
+    <div class="login-card">
+        <div class="logo-wrapper">
+            <img src="logo/TrackKar logo.png" alt="TrackKar Logo" class="logo">
         </div>
 
-        <p style="color: #666; margin: 20px 0; text-align: center;">Sign in to share and track locations with others</p>
+        <h1>TrackKar</h1>
+        <p class="subtitle">Real-time location telemetry & client tracking platform</p>
+
+        <div class="features-list">
+            <div class="feature-item">
+                <span class="feature-icon">■</span>
+                <span>Low-latency Socket.IO telemetry stream</span>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">■</span>
+                <span>Kafka event pipeline engine integration</span>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">■</span>
+                <span>Enterprise Dwaar OIDC session security</span>
+            </div>
+        </div>
 
         <button class="login-button" onclick="loginWithDwaar()">
-            Sign In with Dwaar
+            <span>Sign In with Dwaar OIDC</span>
+            <span>&rarr;</span>
         </button>
 
-        <div class="info">
-            <strong>🔒 Secure Login</strong><br>
-            Powered by your Dwaar OIDC server
+        <div class="info-footer">
+            <span>🔒</span>
+            <span>Secured via Dwaar Authentication Protocol</span>
         </div>
     </div>
 
     <script src="auth.js"></script>
 </body>
+
 </html>
