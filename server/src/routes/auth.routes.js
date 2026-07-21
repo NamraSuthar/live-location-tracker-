@@ -90,8 +90,16 @@ router.get("/callback", async (req, res) => {
     req.session.accessToken = tokenData.access_token;
     req.session.refreshToken = tokenData.refresh_token;
 
-    const clientUrl = process.env.CLIENT_APP_URL || "http://localhost:8000/";
-    return res.redirect(clientUrl);
+    return req.session.save((err) => {
+      if (err) {
+        return res.status(500).json({
+          message: "Failed to save session.",
+        });
+      }
+
+      const clientUrl = process.env.CLIENT_APP_URL || "http://localhost:8000/";
+      return res.redirect(clientUrl);
+    });
   } catch (error) {
     return res.status(500).json({
       message: "Authentication callback failed.",
